@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Transcriber</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            color: #334155; /* Neutral dark gray for text */
+            background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%); /* Soft, subtle background */
+        }
+        
+        .sidebar-toggle { 
+            transition: transform 0.3s ease, box-shadow 0.3s ease; 
+            width: 280px; /* Slightly wider sidebar */
+            background: #ffffff; /* White background for sidebar */
+            box-shadow: 4px 0 10px rgba(0, 0, 0, 0.05); /* Soft shadow */
+            padding: 30px 20px; /* Adjusted padding */
+        }
+        .sidebar-toggle.collapsed { 
+            transform: translateX(-100%); 
+        }
+
+        .toggle-btn { 
+            position: fixed; 
+            left: 20px; 
+            top: 20px; 
+            z-index: 30; /* Ensure it's above everything */
+            background: #4A90E2; /* Primary blue */
+            color: white; 
+            padding: 8px 15px; /* Bigger button */
+            border-radius: 8px; /* More rounded corners */
+            cursor: pointer; 
+            font-size: 1.1em; /* Slightly larger text */
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2); /* Add shadow */
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+        .toggle-btn:hover {
+            background: #357ABD; /* Darker blue on hover */
+            transform: translateY(-1px);
+        }
+
+        .content { 
+            transition: margin-left 0.3s ease; 
+            background: linear-gradient(135deg, #e7eff9 0%, #cfdef3 100%); /* Slightly richer gradient */
+            padding: 30px; /* Consistent padding */
+        }
+        .content.expanded { 
+            margin-left: 280px; /* Match sidebar width */
+        }
+        .content.collapsed { 
+            margin-left: 0; /* Content takes full width when sidebar is collapsed */
+        }
+
+        h1, h2 {
+            font-weight: 600; /* Semi-bold for headings */
+            color: #1A202C; /* Darker text for headings */
+        }
+
+        /* Form element styling */
+        select, input[type="text"], input[type="radio"], input[type="checkbox"] {
+            border-color: #cbd5e0; /* Lighter border */
+            border-radius: 6px;
+        }
+        select:focus, input[type="text"]:focus {
+            border-color: #4A90E2; /* Blue focus ring */
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+        }
+        input[type="radio"]:checked + span::before, input[type="checkbox"]:checked + span::before {
+            background-color: #4A90E2; /* Blue checked state */
+            border-color: #4A90E2;
+        }
+
+        .folder-box { 
+            background: #ffffff; 
+            border: 2px dashed #9bc5f3; /* Lighter dashed border */
+            transition: all 0.3s ease; 
+            cursor: pointer; 
+            padding: 40px 20px; /* More padding */
+            border-radius: 12px; /* More rounded */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #475569; /* Slightly darker text */
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+        }
+        .folder-box:hover { 
+            background: #f8fafc; 
+            border-color: #4A90E2;
+            transform: translateY(-2px); /* Slight lift effect */
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.1);
+        }
+        .folder-box p {
+            margin-bottom: 8px;
+        }
+        .folder-box p:last-child {
+            margin-bottom: 0;
+            font-size: 0.9em;
+            color: #64748b;
+        }
+
+        .audio-item { 
+            background: #ffffff; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08); /* Softer shadow */
+            padding: 15px 20px; /* Adjusted padding */
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* Space out content */
+            margin-bottom: 15px; /* Spacing between items */
+        }
+
+        .audio-player-controls {
+            display: flex;
+            align-items: center;
+            flex-grow: 1; /* Allow controls to take available space */
+        }
+
+        .play-btn {
+            background: none;
+            border: none;
+            color: #64748b; /* Neutral icon color */
+            font-size: 1.5em; /* Larger icon */
+            cursor: pointer;
+            transition: color 0.3s ease, transform 0.2s ease;
+            width: 30px; /* Fixed width */
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .play-btn:hover {
+            color: #4A90E2; /* Blue on hover */
+        }
+        .play-btn.playing {
+            color: #10B981; /* Green when playing */
+            transform: scale(1.1); /* Subtle scale effect */
+        }
+        .play-btn.paused {
+            color: #EF4444; /* Red when paused */
+            transform: scale(1.1);
+        }
+
+        .audio-name {
+            margin-left: 10px;
+            font-weight: 500;
+            color: #334155;
+            flex-grow: 1; /* Allow name to grow */
+            white-space: nowrap; /* Prevent wrapping */
+            overflow: hidden; /* Hide overflow */
+            text-overflow: ellipsis; /* Add ellipsis */
+            max-width: 250px; /* Limit width */
+        }
+
+        progress { 
+            width: 120px; /* Slightly smaller progress bar */
+            height: 6px; /* Thinner progress bar */
+            margin-left: 15px; 
+            vertical-align: middle; 
+            -webkit-appearance: none;
+            appearance: none;
+            border-radius: 5px;
+        }
+        progress::-webkit-progress-bar {
+            background-color: #e2e8f0; /* Light background for the bar */
+            border-radius: 5px;
+        }
+        progress::-webkit-progress-value {
+            background-color: #4A90E2; /* Blue progress */
+            border-radius: 5px;
+        }
+        progress::-moz-progress-bar {
+            background-color: #4A90E2;
+            border-radius: 5px;
+        }
+
+        .duration {
+            font-size: 0.85em;
+            color: #64748b;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+
+        textarea {
+            flex-grow: 2; /* Allow textarea to take more space */
+            margin-left: 20px;
+            padding: 10px;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            resize: vertical; /* Allow vertical resizing */
+            min-height: 60px; /* Minimum height */
+            font-size: 0.95em;
+            color: #334155;
+            line-height: 1.5;
+        }
+
+        .delete-btn {
+            position: absolute;
+            top: 8px; /* Position at top right */
+            right: 8px; 
+            background: #EF4444; 
+            color: white;
+            border: none;
+            border-radius: 50%; 
+            width: 28px; /* Slightly larger delete button */
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1em; /* Clearer 'x' */
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+        }
+        .delete-btn:hover {
+            opacity: 1;
+            background-color: #DC2626; 
+            transform: scale(1.1); /* Pop on hover */
+        }
+
+        /* Buttons (Transcribe, Save) */
+        .btn-primary {
+            background-color: #4A90E2; /* Primary blue */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary:hover {
+            background-color: #357ABD; /* Darker blue on hover */
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled {
+            background-color: #9bd3f3; /* Lighter blue when disabled */
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        
+        .btn-success {
+            background-color: #10B981; /* Green for save */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .btn-success:hover {
+            background-color: #0d9d6e; /* Darker green on hover */
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+    <div class="flex h-screen">
+        <button id="toggleBtn" class="toggle-btn">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+
+        <div id="sidebar" class="sidebar-toggle fixed h-full z-10">
+            <h2 class="text-2xl font-semibold mb-8 text-gray-900 pl-16">Settings</h2>
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Upload Option</label>
+                    <div class="flex flex-col space-y-3">
+                        <label class="flex items-center text-gray-600">
+                            <input type="radio" name="uploadOption" value="singleAudio" checked onchange="updateFileInput()" class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 transition duration-150 ease-in-out">
+                            <span class="ml-2">Single Audio File</span>
+                        </label>
+                        <label class="flex items-center text-gray-600">
+                            <input type="radio" name="uploadOption" value="folderAudios" onchange="updateFileInput()" class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 transition duration-150 ease-in-out">
+                            <span class="ml-2">Folder with Audios</span>
+                        </label>
+                        <label class="flex items-center text-gray-600">
+                            <input type="radio" name="uploadOption" value="folderSubfolders" onchange="updateFileInput()" class="form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 transition duration-150 ease-in-out">
+                            <span class="ml-2">Folder with Subfolders</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Language</label>
+                    <select class="mt-1 p-2 w-full border border-gray-300 rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-150 ease-in-out" id="language">
+                        <option value="ur">Urdu</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Model</label>
+                    <div class="space-y-3">
+                        <label class="flex items-center text-gray-600">
+                            <input type="radio" name="model" class="mr-2 form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 transition duration-150 ease-in-out" id="whisperLargeV3" value="whisper-large-v3" checked>
+                            Whisper Large V3
+                        </label>
+                        <label class="flex items-center text-gray-600">
+                            <input type="radio" name="model" class="mr-2 form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 transition duration-150 ease-in-out" id="assemblyAI" value="assemblyAI">
+                            Assembly AI
+                        </label>
+                        <label class="flex items-center text-gray-600">
+                            <input type="radio" name="model" class="mr-2 form-radio h-4 w-4 text-blue-600 focus:ring-blue-500 transition duration-150 ease-in-out" id="deepSpeech" value="deepSpeech">
+                            DeepSpeech
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 text-gray-700">Export As</label>
+                    <div class="space-y-3">
+                        <label class="flex items-center text-gray-600">
+                            <input type="checkbox" class="mr-2 form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 rounded transition duration-150 ease-in-out" id="excelFormat">
+                            Excel Format
+                        </label>
+                        <label class="flex items-center text-gray-600">
+                            <input type="checkbox" class="mr-2 form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 rounded transition duration-150 ease-in-out" id="jsonFormat">
+                            JSON Format
+                        </label>
+                        <label class="flex items-center text-gray-600">
+                            <input type="checkbox" class="mr-2 form-checkbox h-4 w-4 text-blue-600 focus:ring-blue-500 rounded transition duration-150 ease-in-out" id="textFileFormat">
+                            TextFile Format
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="content" class="content flex-1 p-6 overflow-auto">
+            <h1 class="text-4xl font-bold text-center mb-10 text-gray-900">Audio Transcriber</h1>
+            <div class="max-w-4xl mx-auto space-y-6">
+                <div id="folderBox" class="folder-box" onclick="triggerFileSelection()">
+                    <svg class="w-16 h-16 text-blue-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+                    <p class="text-xl font-semibold text-gray-700">Drag & Drop Your Audio Files Here or Click to Browse</p>
+                    <p class="text-sm text-gray-500 mt-2">Supports single files, folders with audios, or folders with subfolders. Select your upload option in the sidebar settings.</p>
+                </div>
+
+                <div class="flex justify-center space-x-4 mt-6">
+                    <button id="transcribeBtn" class="btn-primary hidden" onclick="transcribeLoadedAudios()">
+                        Transcribe Audio(s)
+                    </button>
+                    <button id="saveBtn" class="btn-success hidden" onclick="saveTranscriptions()">
+                        Save Transcriptions
+                    </button>
+                </div>
+                
+                <div id="audioList" class="space-y-4">
+                    </div>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="singleAudioInput" class="hidden" accept="audio/*" onchange="handleFileSelection(event)">
+    <input type="file" id="folderInput" class="hidden" webkitdirectory directory onchange="handleFileSelection(event)">
+    <audio id="globalAudio" style="display:none;"></audio>
+
+    <script>
+        const sidebar = document.getElementById('sidebar');
+        const content = document.getElementById('content');
+        const toggleBtn = document.getElementById('toggleBtn');
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const globalAudio = document.getElementById('globalAudio');
+        const singleAudioInput = document.getElementById('singleAudioInput');
+        const folderInput = document.getElementById('folderInput');
+        const audioList = document.getElementById('audioList');
+
+        let isCollapsed = false;
+        let currentPath = null;
+        let currentButton = null;
+        let currentAudioName = null; 
+        let loadedAudios = []; 
+
+        // Initial setup for file input visibility
+        updateFileInput();
+
+        // Initialize sidebar state on load
+        if (window.innerWidth < 768) { // Collapse by default on smaller screens
+            isCollapsed = true;
+            sidebar.classList.add('collapsed');
+            content.classList.remove('expanded');
+            content.classList.add('collapsed');
+            toggleBtn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>';
+        } else {
+            content.classList.add('expanded');
+            toggleBtn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+        }
+
+
+        toggleBtn.addEventListener('click', () => {
+            isCollapsed = !isCollapsed;
+            sidebar.classList.toggle('collapsed', isCollapsed);
+            content.classList.toggle('expanded', !isCollapsed);
+            content.classList.toggle('collapsed', isCollapsed);
+            if (isCollapsed) {
+                toggleBtn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>';
+            } else {
+                toggleBtn.innerHTML = '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+            }
+        });
+
+        function triggerFileSelection() {
+            const selectedOption = document.querySelector('input[name="uploadOption"]:checked').value;
+            if (selectedOption === 'singleAudio') {
+                singleAudioInput.click();
+            } else {
+                folderInput.click();
+            }
+        }
+
+        function updateFileInput() {
+            const selectedOption = document.querySelector('input[name="uploadOption"]:checked').value;
+            if (selectedOption === 'singleAudio') {
+                singleAudioInput.removeAttribute('webkitdirectory');
+                singleAudioInput.removeAttribute('directory');
+                singleAudioInput.multiple = false;
+                singleAudioInput.accept = "audio/*";
+                folderInput.value = null; // Clear folder input
+            } else {
+                folderInput.setAttribute('webkitdirectory', '');
+                folderInput.setAttribute('directory', '');
+                folderInput.multiple = true; 
+                singleAudioInput.value = null; // Clear single audio input
+            }
+        }
+
+        async function handleFileSelection(event) {
+            const files = event.target.files;
+            if (files.length === 0) {
+                return;
+            }
+
+            const formData = new FormData();
+            const selectedOption = document.querySelector('input[name="uploadOption"]:checked').value;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                // Only process audio files
+                if (!file.type.startsWith('audio/')) {
+                    console.warn(`Skipping non-audio file: ${file.name}`);
+                    continue;
+                }
+
+                let relativePath = file.name; 
+                if (selectedOption !== 'singleAudio') {
+                    // For folder uploads, webkitRelativePath provides the full path
+                    relativePath = file.webkitRelativePath || file.name;
+                }
+                formData.append('audioFiles', file, relativePath); 
+            }
+            
+            if (Array.from(formData.entries()).length === 0) {
+                alert('No audio files selected or found in the chosen folder.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/upload_audios', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (data.audios && data.audios.length > 0) {
+                    loadedAudios = data.audios.map(audio => ({ ...audio, transcribed: false }));
+                    audioList.innerHTML = ''; // Clear previous list
+                    loadedAudios.forEach(audio => {
+                        const div = document.createElement('div');
+                        div.className = 'audio-item';
+                        div.id = `audio-item-${audio.name}`;
+                        div.innerHTML = `
+                        <div style="display: flex; justify-content: center; width: 100%;">
+                            <div style="display: flex; gap: 100px; align-items: flex-start; max-width: 800px; margin: 0 auto;">
+                                <div class="audio-player-controls">
+                                    <button class="play-btn" data-path="/serve_audio?path=${encodeURIComponent(audio.path)}">
+                                        ▶
+                                    </button>
+                                    <span class="audio-name" title="${audio.display_name}">${audio.display_name}</span>
+                                    <progress class="progress-bar" id="progress_${audio.name}" value="0" max="100"></progress>
+                                    <span class="duration" id="duration_${audio.name}">0:00 / 0:00</span>
+                                </div>
+                                <textarea class="p-2 border rounded-md" id="trans_${audio.name}" placeholder="Transcription will appear here..." rows="1"></textarea>
+                                <button class="delete-btn" data-name="${audio.name}">×</button>
+                            </div>
+                        </div>
+                    `;
+                    audioList.appendChild(div);
+                    });
+                    transcribeBtn.classList.remove('hidden');
+                    saveBtn.classList.add('hidden'); 
+                } else {
+                    alert('No audio files found or uploaded.');
+                    transcribeBtn.classList.add('hidden');
+                    saveBtn.classList.add('hidden');
+                    audioList.innerHTML = '';
+                }
+            } catch (error) {
+                console.error('Error uploading audios:', error);
+                alert('Failed to upload audio files. Please check the console for details.');
+            } finally {
+                // Clear the file input's value to allow re-uploading the same file(s)
+                event.target.value = null;
+            }
+        }
+
+        function transcribeLoadedAudios() {
+            if (loadedAudios.length === 0) {
+                alert('No audios loaded to transcribe.');
+                return;
+            }
+            const model = document.querySelector('input[name="model"]:checked').value;
+            const language = document.getElementById('language').value;
+            
+            transcribeBtn.textContent = 'Transcribing...';
+            transcribeBtn.disabled = true;
+
+            fetch('/transcribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ audios: loadedAudios.map(a => a.path), model, language })
+            })
+            .then(response => response.json())
+            .then(data => {
+                data.transcriptions.forEach(trans => {
+                    const textarea = document.getElementById(`trans_${trans.name}`);
+                    if (textarea) {
+                        textarea.value = trans.transcription;
+                        const audioObj = loadedAudios.find(a => a.name === trans.name);
+                        if (audioObj) {
+                            audioObj.transcription = trans.transcription; 
+                            audioObj.transcribed = true;
+                        }
+                    }
+                });
+                transcribeBtn.classList.add('hidden');
+                transcribeBtn.textContent = 'Transcribe Audio(s)';
+                transcribeBtn.disabled = false;
+                saveBtn.classList.remove('hidden'); 
+            })
+            .catch(error => {
+                console.error('Transcription error:', error);
+                alert('Transcription failed. Please check the console for errors.');
+                transcribeBtn.textContent = 'Transcribe Audio(s)';
+                transcribeBtn.disabled = false;
+            });
+        }
+
+        function saveTranscriptions() {
+            const excelFormat = document.getElementById('excelFormat').checked;
+            const jsonFormat = document.getElementById('jsonFormat').checked;
+            const textFileFormat = document.getElementById('textFileFormat').checked;
+
+            if (!excelFormat && !jsonFormat && !textFileFormat) {
+                alert('Please select at least one export format.');
+                return;
+            }
+
+            const transcriptions = loadedAudios.filter(a => a.transcribed).map(a => ({
+                name: a.display_name, 
+                transcription: document.getElementById(`trans_${a.name}`).value 
+            }));
+
+            if (transcriptions.length === 0) {
+                alert('No transcriptions available to save.');
+                return;
+            }
+
+            if (excelFormat) {
+                fetch('/save_excel', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ transcriptions })
+                }).then(response => response.text())
+                  .then(message => alert(message))
+                  .catch(error => console.error('Excel save error:', error));
+            }
+            if (jsonFormat) {
+                fetch('/save_json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ transcriptions })
+                }).then(response => response.text())
+                  .then(message => alert(message))
+                  .catch(error => console.error('JSON save error:', error));
+            }
+            if (textFileFormat) {
+                fetch('/save_txt', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ transcriptions })
+                }).then(response => response.text())
+                  .then(message => alert(message))
+                  .catch(error => console.error('TXT save error:', error));
+            }
+        }
+
+        // --- Main Playback Logic ---
+        document.addEventListener('click', (e) => {
+        // Handle Play/Pause button clicks
+        if (e.target.classList.contains('play-btn') || e.target.closest('.play-btn')) {
+            const playButton = e.target.closest('.play-btn');
+            const clickedPath = playButton.getAttribute('data-path');
+            const audioItemDiv = playButton.closest('.audio-item');
+            const textareaId = audioItemDiv ? audioItemDiv.querySelector('textarea[id^="trans_"]').id : '';
+            const clickedAudioName = textareaId.replace('trans_', ''); 
+
+            // Case 1: Clicking the same button that's currently playing
+            if (currentPath === clickedPath && !globalAudio.paused) {
+                globalAudio.pause();
+                playButton.classList.remove('playing');
+                playButton.classList.add('paused');
+                playButton.innerHTML = '▶';
+                return;
+            }
+
+            // Case 2: Clicking the same button that's currently paused
+            if (currentPath === clickedPath && globalAudio.paused) {
+                globalAudio.play()
+                    .then(() => {
+                        playButton.classList.remove('paused');
+                        playButton.classList.add('playing');
+                        playButton.innerHTML = '❚❚';
+                    })
+                    .catch(error => console.error('Resume play error:', error));
+                return;
+            }
+
+            // Case 3: Different audio or no audio loaded
+            // Stop current audio if playing
+            if (currentPath && !globalAudio.paused) {
+                globalAudio.pause();
+                if (currentButton) {
+                    currentButton.classList.remove('playing');
+                    currentButton.classList.add('paused');
+                    currentButton.innerHTML = '▶';
+                }
+            }
+
+            // Reset current audio if different audio is selected
+            if (currentPath !== clickedPath) {
+                globalAudio.pause();
+                globalAudio.currentTime = 0;
+                
+                // Reset previous audio UI
+                if (currentButton && currentPath !== clickedPath) {
+                    currentButton.classList.remove('playing');
+                    currentButton.classList.add('paused');
+                    currentButton.innerHTML = '▶';
+                    if (currentAudioName) {
+                        updateProgress(currentAudioName, true);
+                    }
+                }
+                
+                // Load new audio
+                globalAudio.src = clickedPath;
+                currentPath = clickedPath;
+                currentButton = playButton;
+                currentAudioName = clickedAudioName;
+            }
+
+            // Play the audio
+            globalAudio.play()
+                .then(() => {
+                    playButton.classList.remove('paused');
+                    playButton.classList.add('playing');
+                    playButton.innerHTML = '❚❚';
+                })
+                .catch(error => console.error('Play error:', error));
+        } 
+            // Handle Delete button clicks (Event Delegation)
+            else if (e.target.classList.contains('delete-btn')) {
+                const audioNameToDelete = e.target.getAttribute('data-name');
+                deleteAudio(audioNameToDelete);
+            }
+        });
+
+        // --- Global Audio Event Listeners (Defined Once) ---
+        globalAudio.onended = () => {
+            if (currentAudioName) {
+                updateProgress(currentAudioName, true); // Reset progress for the ended audio
+            }
+            // Reset global state variables when audio truly ends
+            currentPath = null;
+            currentAudioName = null; 
+            if (currentButton) {
+                currentButton.classList.remove('playing');
+                currentButton.classList.add('paused');
+                currentButton.innerHTML = '▶'; // Reset icon to play
+                currentButton = null; 
+            }
+        };
+
+        globalAudio.addEventListener('loadedmetadata', () => {
+            if (currentAudioName) { 
+                updateDuration(currentAudioName);
+            }
+        });
+
+        globalAudio.addEventListener('timeupdate', () => {
+            if (currentAudioName) { 
+                updateProgress(currentAudioName);
+            }
+        });
+
+        // --- Helper Functions for UI Updates ---
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        function updateDuration(name) {
+            const durationSpan = document.getElementById(`duration_${name}`);
+            const totalDuration = isNaN(globalAudio.duration) ? 0 : globalAudio.duration;
+            durationSpan.textContent = `0:00 / ${formatTime(totalDuration)}`;
+        }
+
+        function updateProgress(name, reset = false) {
+            const progressBar = document.getElementById(`progress_${name}`);
+            const durationSpan = document.getElementById(`duration_${name}`);
+            if (!progressBar || !durationSpan) { 
+                return;
+            }
+            if (reset || isNaN(globalAudio.duration)) {
+                progressBar.value = 0;
+                durationSpan.textContent = `0:00 / 0:00`;
+            } else {
+                const progress = (globalAudio.currentTime / globalAudio.duration) * 100;
+                progressBar.value = progress;
+                durationSpan.textContent = `${formatTime(globalAudio.currentTime)} / ${formatTime(globalAudio.duration)}`;
+            }
+        }
+
+        // --- New Function to Delete Audio Item ---
+        function deleteAudio(audioName) {
+            if (!confirm(`Are you sure you want to delete "${audioName}" from the list? This will not delete the original file.`)) {
+                return;
+            }
+
+            // Stop audio if it's currently playing and is the one being deleted
+            if (currentAudioName === audioName) {
+                globalAudio.pause();
+                globalAudio.currentTime = 0;
+                currentPath = null;
+                if (currentButton) {
+                    currentButton.classList.remove('playing', 'paused');
+                    currentButton.innerHTML = '▶';
+                }
+                currentButton = null;
+                currentAudioName = null;
+            }
+
+            // Remove from loadedAudios array
+            loadedAudios = loadedAudios.filter(audio => audio.name !== audioName);
+
+            // Remove from DOM
+            const audioItemElement = document.getElementById(`audio-item-${audioName}`);
+            if (audioItemElement) {
+                audioItemElement.remove();
+            }
+
+            // Hide Transcribe/Save buttons if no audios are left
+            if (loadedAudios.length === 0) {
+                transcribeBtn.classList.add('hidden');
+                saveBtn.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

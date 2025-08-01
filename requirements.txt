@@ -2,3 +2,4 @@ groq
 python-dotenv
 xlsxwriter
 dotenv
+__pycache__/

@@ -170,11 +170,10 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         transcriptions = data['transcriptions']
         
         try:
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"transcriptions_{timestamp}.xlsx"
-            
-            # Create an Excel workbook and add a worksheet
-            workbook = xlsxwriter.Workbook(filename)
+            # Create workbook in memory
+            import io
+            output = io.BytesIO()
+            workbook = xlsxwriter.Workbook(output)
             worksheet = workbook.add_worksheet()
             
             # Add header
@@ -188,15 +187,23 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
             
             workbook.close()
             
+            # Prepare response with the Excel file
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"transcriptions_{timestamp}.xlsx"
+            
             self.send_response(200)
-            self.send_header('Content-type', 'text/plain')
+            self.send_header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
             self.end_headers()
-            self.wfile.write(f"Transcriptions saved as {filename}".encode())
+            
+            # Send the Excel file from memory
+            output.seek(0)
+            self.wfile.write(output.read())
         except Exception as e:
             self.send_response(500)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
-            self.wfile.write(f"Error saving Excel: {str(e)}".encode())
+            self.wfile.write(f"Error generating Excel: {str(e)}".encode())
 
     def handle_save_json(self):
         content_length = int(self.headers['Content-Length'])
@@ -204,21 +211,23 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         transcriptions = data['transcriptions']
         
         try:
+            # Create JSON in memory
+            json_data = json.dumps(transcriptions, ensure_ascii=False, indent=4)
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"transcriptions_{timestamp}.json"
             
-            with open(filename, 'w', encoding='utf-8') as jsonfile:
-                json.dump(transcriptions, jsonfile, ensure_ascii=False, indent=4)
-            
             self.send_response(200)
-            self.send_header('Content-type', 'text/plain')
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
             self.end_headers()
-            self.wfile.write(f"Transcriptions saved as {filename}".encode())
+            
+            # Send the JSON file
+            self.wfile.write(json_data.encode('utf-8'))
         except Exception as e:
             self.send_response(500)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
-            self.wfile.write(f"Error saving JSON: {str(e)}".encode())
+            self.wfile.write(f"Error generating JSON: {str(e)}".encode())
 
     def handle_save_txt(self):
         content_length = int(self.headers['Content-Length'])
@@ -226,28 +235,29 @@ class MyHandler(http.server.SimpleHTTPRequestHandler):
         transcriptions = data['transcriptions']
         
         try:
+            # Create TXT in memory
+            txt_content = ""
+            for item in transcriptions:
+                speaker = ''.join([c for c in item['name'] if not c.isdigit() and c != '/'])
+                if not speaker:
+                    speaker = "UnknownSpeaker"
+                txt_content += f"{speaker}\t{item['transcription']}\n"
+            
             timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"transcriptions_{timestamp}.txt"
             
-            with open(filename, 'w', encoding='utf-8') as txtfile:
-                for item in transcriptions:
-                    # Extract speaker name (assuming format like "Arslan1", "Fatima6", etc.)
-                    # This logic might need refinement based on actual speaker naming conventions
-                    speaker = ''.join([c for c in item['name'] if not c.isdigit() and c != '/']) # Exclude path separators
-                    if not speaker: # Fallback if no speaker name can be extracted
-                        speaker = "UnknownSpeaker"
-                    # Write in the format: SpeakerName Transcription
-                    txtfile.write(f"{speaker}\t{item['transcription']}\n")
-            
             self.send_response(200)
-            self.send_header('Content-type', 'text/plain')
+            self.send_header('Content-Type', 'text/plain')
+            self.send_header('Content-Disposition', f'attachment; filename="{filename}"')
             self.end_headers()
-            self.wfile.write(f"Transcriptions saved as {filename}".encode())
+            
+            # Send the TXT file
+            self.wfile.write(txt_content.encode('utf-8'))
         except Exception as e:
             self.send_response(500)
             self.send_header('Content-type', 'text/plain')
             self.end_headers()
-            self.wfile.write(f"Error saving text file: {str(e)}".encode())
+            self.wfile.write(f"Error generating text file: {str(e)}".encode())
 
 # Set up and start the server
 if __name__ == "__main__":

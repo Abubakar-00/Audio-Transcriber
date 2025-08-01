@@ -547,53 +547,66 @@
         }
 
         function saveTranscriptions() {
-            const excelFormat = document.getElementById('excelFormat').checked;
-            const jsonFormat = document.getElementById('jsonFormat').checked;
-            const textFileFormat = document.getElementById('textFileFormat').checked;
+    const excelFormat = document.getElementById('excelFormat').checked;
+    const jsonFormat = document.getElementById('jsonFormat').checked;
+    const textFileFormat = document.getElementById('textFileFormat').checked;
 
-            if (!excelFormat && !jsonFormat && !textFileFormat) {
-                alert('Please select at least one export format.');
-                return;
-            }
+    if (!excelFormat && !jsonFormat && !textFileFormat) {
+        alert('Please select at least one export format.');
+        return;
+    }
 
-            const transcriptions = loadedAudios.filter(a => a.transcribed).map(a => ({
-                name: a.display_name, 
-                transcription: document.getElementById(`trans_${a.name}`).value 
-            }));
+    const transcriptions = loadedAudios.filter(a => a.transcribed).map(a => ({
+        name: a.display_name, 
+        transcription: document.getElementById(`trans_${a.name}`).value 
+    }));
 
-            if (transcriptions.length === 0) {
-                alert('No transcriptions available to save.');
-                return;
-            }
+    if (transcriptions.length === 0) {
+        alert('No transcriptions available to save.');
+        return;
+    }
 
-            if (excelFormat) {
-                fetch('/save_excel', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ transcriptions })
-                }).then(response => response.text())
-                  .then(message => alert(message))
-                  .catch(error => console.error('Excel save error:', error));
-            }
-            if (jsonFormat) {
-                fetch('/save_json', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ transcriptions })
-                }).then(response => response.text())
-                  .then(message => alert(message))
-                  .catch(error => console.error('JSON save error:', error));
-            }
-            if (textFileFormat) {
-                fetch('/save_txt', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ transcriptions })
-                }).then(response => response.text())
-                  .then(message => alert(message))
-                  .catch(error => console.error('TXT save error:', error));
-            }
-        }
+    // Helper function to trigger download
+    const downloadFile = (content, fileName, contentType) => {
+        const a = document.createElement('a');
+        const file = new Blob([content], {type: contentType});
+        a.href = URL.createObjectURL(file);
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
+    if (excelFormat) {
+        fetch('/save_excel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transcriptions })
+        })
+        .then(response => response.blob())
+        .then(blob => {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            downloadFile(blob, `transcriptions_${timestamp}.xlsx`, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        })
+        .catch(error => console.error('Excel save error:', error));
+    }
+
+    if (jsonFormat) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const jsonContent = JSON.stringify(transcriptions, null, 2);
+        downloadFile(jsonContent, `transcriptions_${timestamp}.json`, 'application/json');
+    }
+
+    if (textFileFormat) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        let txtContent = '';
+        transcriptions.forEach(item => {
+            const speaker = item.name.replace(/[0-9]/g, '').replace(/\.[^/.]+$/, '');
+            txtContent += `${speaker || 'UnknownSpeaker'}\t${item.transcription}\n`;
+        });
+        downloadFile(txtContent, `transcriptions_${timestamp}.txt`, 'text/plain');
+    }
+}
 
         // --- Main Playback Logic ---
         document.addEventListener('click', (e) => {

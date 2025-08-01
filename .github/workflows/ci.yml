@@ -27,7 +27,7 @@ jobs:
         run: flake8 server.py
 
       - name: Run pytest
-        run: PYTHONPATH=. pytest
+        run: GROQ_API_KEY=dummy PYTHONPATH=. pytest
 
   build-and-push:
     runs-on: ubuntu-latest

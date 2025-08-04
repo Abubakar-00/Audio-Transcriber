@@ -2,8 +2,9 @@
 
 A powerful web-based audio transcription tool that leverages Groq's Whisper API to convert audio files into text with support for multiple languages and export formats.
 
-![Preview](<img width="1453" height="681" alt="image" src="https://github.com/user-attachments/assets/5bd0ddd5-0dc5-46a5-868d-4187fdbb750e" />
-)
+<p align="center">
+    <img width="1920" height="854" alt="image" src="https://github.com/user-attachments/assets/c52b37c3-e9ce-4eb0-b8f4-7bfb69b3333d" />
+</p>
 
 ## ✨ Features
 

@@ -55,6 +55,5 @@ jobs:
           context: .
           push: true
           tags: |
-              abubakar00/audio-transcriber:latest
-              abubakar00/audio-transcriber:${{ github.sha }}
-
+            ${{ secrets.DOCKERHUB_USERNAME }}/audio-transcriber:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/audio-transcriber:${{ env.VERSION }}

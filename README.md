@@ -182,7 +182,7 @@ flake8 .
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## 🙏 Acknowledgments:
 
 - [Groq](https://groq.com/) for providing the Whisper API
 - [Tailwind CSS](https://tailwindcss.com/) for the beautiful UI components

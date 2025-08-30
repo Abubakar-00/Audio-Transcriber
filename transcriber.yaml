@@ -1,0 +1,45 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: audio-transcriber
+  namespace: transcriber
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: audio-transcriber
+  template:
+    metadata:
+      labels:
+        app: audio-transcriber
+    spec:
+      # Keep workloads off the control-plane; adjust if your worker label differs
+      nodeSelector:
+        node-role.kubernetes.io/worker: worker
+      containers:
+        - name: app
+          image: abubakar00/audio-transcriber:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          # Load all vars from your .env (now stored as a Secret)
+          envFrom:
+            - secretRef:
+                name: app-env
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: audio-transcriber-svc
+  namespace: transcriber
+spec:
+  type: NodePort
+  selector:
+    app: audio-transcriber
+  ports:
+    - port: 8000       # service port
+      targetPort: 8000 # container port
+      # nodePort: 30080  # (optional) fix a port; otherwise K8s picks one
+
